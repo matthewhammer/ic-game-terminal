@@ -1,0 +1,34 @@
+[package]
+name = "icmt-web"
+version = "0.1.0"
+authors = ["Matthew Hammer <matthew.hammer@gmail.com>"]
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "0.2.63"
+icmt = { path = "../icmt" }
+wasm-bindgen-futures = "0.4.24"
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3.13"
+
+[dependencies.web-sys]
+version = "0.3.4"
+features = [  
+  'console',
+  'CanvasRenderingContext2d',
+  'Document',
+  'Element',
+  'HtmlCanvasElement',
+  'HtmlElement',
+  'Node',
+  'Window',
+  'KeyboardEvent',
+]
+
+[profile.release]
+# Tell `rustc` to optimize for small code size.
+opt-level = "s"

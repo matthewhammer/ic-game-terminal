@@ -3,7 +3,7 @@
 use sdl2::keyboard::Keycode;
 use sdl2::keyboard::Mod;
 
-use super::types::event::KeyEventInfo;
+pub use super::types::event::KeyEventInfo;
 
 use log::info;
 

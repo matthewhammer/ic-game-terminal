@@ -31,7 +31,7 @@ use std::sync::mpsc;
 use std::time::Duration;
 use tokio::task;
 
-use icmt::{
+use icmt_sdl2::{
     cli::*,
     draw::*,
     error::*,

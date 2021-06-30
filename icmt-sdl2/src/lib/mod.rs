@@ -9,10 +9,13 @@ extern crate serde;
 extern crate serde_bytes;
 //extern crate candid_derive;
 
+// common types.
+pub mod types;
+
+// all specific to SDL2-based IO:
 pub mod cli;
+pub mod write;
+pub mod error;
 pub mod color;
 pub mod draw;
-pub mod error;
 pub mod keyboard;
-pub mod types;
-pub mod write;

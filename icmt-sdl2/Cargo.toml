@@ -1,5 +1,5 @@
 [package]
-name = "icmt"
+name = "icmt-sdl2"
 version = "0.1.0"
 authors = ["Matthew A Hammer <pubmah@nym.hush.com>"]
 edition = "2018"
@@ -9,6 +9,24 @@ documentation = "https://docs.rs/icmt"
 repository = "https://github.com/matthewhammer/ic-mini-terminal"
 license = "Apache-2.0"
 readme = "README.md"
+
+[[bin]]
+name = "ic-mt"
+path = "src/bin/ic-mt.rs"
+
+[lib]
+crate-type = ["lib"]
+name = "icmt_sdl2"
+path = "src/lib/mod.rs"
+test = true            # Is tested by default.
+doctest = true         # Documentation examples are tested by default.
+bench = true           # Is benchmarked by default.
+doc = true             # Is documented by default.
+plugin = false         # Used as a compiler plugin (deprecated).
+proc-macro = false     # Set to `true` for a proc-macro library.
+harness = true         # Use libtest harness.
+edition = "2018"       # The edition of the target.
+required-features = [] # Features required to build this target (N/A for lib).
 
 [dependencies]
 chrono = "0.4"
@@ -33,25 +51,10 @@ ic-agent = "0.5.0"
 ic-types = "0.1.3"
 #candid = "0.6.11"
 ron = "*"
+js-sys = "0.3"
+#wasm-bindgen = "0.2.58"
+icmt = { path = "../icmt" }
 
 [dependencies.candid]
 git = "https://github.com/dfinity/candid"
 branch = "master"
-
-[lib]
-name = "icmt"
-path = "src/lib/mod.rs"
-test = true            # Is tested by default.
-doctest = true         # Documentation examples are tested by default.
-bench = true           # Is benchmarked by default.
-doc = true             # Is documented by default.
-plugin = false         # Used as a compiler plugin (deprecated).
-proc-macro = false     # Set to `true` for a proc-macro library.
-harness = true         # Use libtest harness.
-edition = "2018"       # The edition of the target.
-crate-type = ["lib"]   # The crate types to generate.
-required-features = [] # Features required to build this target (N/A for lib).
-
-[[bin]]
-name = "ic-mt"
-path = "src/bin/ic-mt.rs"

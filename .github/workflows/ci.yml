@@ -28,7 +28,9 @@ jobs:
         brew install rustup
         rustup-init -y --default-toolchain stable
     - name: Build
-      run: cargo build --release --locked
+      run: |
+        cargo build --release --locked --manifest-path icmt/Cargo.toml
+        cargo build --release --locked --manifest-path icmt-web/Cargo.toml
 
   build_linux_release:
     name: Build ic-mt for ${{ matrix.os }}
@@ -51,5 +53,6 @@ jobs:
       run: |
         sudo apt-get install libsdl2-dev
     - name: Build
-      run: cargo build --release --locked
-
+      run: |
+        cargo build --release --locked --manifest-path icmt/Cargo.toml
+        cargo build --release --locked --manifest-path icmt-web/Cargo.toml

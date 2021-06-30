@@ -1,0 +1,50 @@
+[package]
+name = "icmt"
+version = "0.1.0"
+authors = ["Matthew A Hammer <pubmah@nym.hush.com>"]
+edition = "2018"
+description = "The Internet Computer Mini Terminal.  Live input and output for IC canisters."
+homepage = "https://docs.rs/icmt"
+documentation = "https://docs.rs/icmt"
+repository = "https://github.com/matthewhammer/ic-mini-terminal"
+license = "Apache-2.0"
+readme = "README.md"
+
+[lib]
+crate-type = ["lib"]
+name = "icmt"
+path = "src/lib/mod.rs"
+test = true            # Is tested by default.
+doctest = true         # Documentation examples are tested by default.
+bench = true           # Is benchmarked by default.
+doc = true             # Is documented by default.
+plugin = false         # Used as a compiler plugin (deprecated).
+proc-macro = false     # Set to `true` for a proc-macro library.
+harness = true         # Use libtest harness.
+edition = "2018"       # The edition of the target.
+required-features = [] # Features required to build this target (N/A for lib).
+
+[dependencies]
+chrono = "0.4"
+clap = "2.33"
+structopt = "0.2"
+log = "0.4"
+env_logger = "0.6"
+serde = { version = "1.0", features = ["derive"] }
+serde_bytes = "0.11"
+serde_cbor = "0.9"
+serde_json = "1.0"
+tokio = { version = "1", features = ["full"] }
+garcon = "0.2.3"
+hex = "0.4.2"
+num-bigint = "0.2.6"
+num-traits = "0.2.6"
+futures = "0.3.5"
+#candid = "0.6.11"
+ron = "*"
+js-sys = "0.3"
+#wasm-bindgen = "0.2.58"
+
+[dependencies.candid]
+git = "https://github.com/dfinity/candid"
+branch = "master"
