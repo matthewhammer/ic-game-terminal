@@ -6,6 +6,8 @@ use structopt::StructOpt;
 use ic_agent::Agent;
 use ic_types::Principal;
 
+use std::path::PathBuf;
+
 /// Internet Computer Mini Terminal (ic-mt)
 #[derive(StructOpt, Debug, Clone)]
 #[structopt(name = "ic-mt", raw(setting = "clap::AppSettings::DeriveDisplayOrder"))]
@@ -72,6 +74,7 @@ pub struct ConnectCtx {
     pub cfg: ConnectCfg,
     pub agent: Agent,
     pub canister_id: Principal,
+    pub data_path: PathBuf,
 }
 
 /// Connection configuration

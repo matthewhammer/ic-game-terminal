@@ -26,7 +26,10 @@ use sdl2::keyboard::Keycode;
 use sdl2::render::{Canvas, RenderTarget};
 use sdl2::surface::Surface;
 use std::fs;
+use std::fs::{File, OpenOptions};
 use std::io;
+use std::io::Write;
+use std::path::PathBuf;
 use std::sync::mpsc;
 use std::time::Duration;
 use tokio::task;
@@ -147,6 +150,7 @@ async fn do_view_task(
     cfg: ConnectCfg,
     remote_in: mpsc::Receiver<Option<(graphics::Dim, Vec<event::EventInfo>)>>,
     remote_out: mpsc::Sender<graphics::Result>,
+    data_path: PathBuf,
 ) -> IcmtResult<()> {
     /* Create our own agent here since we cannot Send it here from the main thread. */
     let canister_id = Principal::from_text(cfg.canister_id.clone()).unwrap();
@@ -155,6 +159,7 @@ async fn do_view_task(
         cfg: cfg.clone(),
         canister_id,
         agent,
+        data_path: data_path.clone(),
     };
 
     loop {
@@ -175,6 +180,7 @@ async fn do_update_task(
     cfg: ConnectCfg,
     remote_in: mpsc::Receiver<ServiceCall>,
     remote_out: mpsc::Sender<Vec<graphics::Result>>,
+    data_path: PathBuf,
 ) -> IcmtResult<()> {
     /* Create our own agent here since we cannot Send it here from the main thread. */
     let canister_id = Principal::from_text(cfg.canister_id.clone()).unwrap();
@@ -183,6 +189,7 @@ async fn do_update_task(
         cfg,
         canister_id,
         agent,
+        data_path,
     };
     loop {
         let sc = remote_in.recv().unwrap();
@@ -263,11 +270,12 @@ async fn local_event_loop(ctx: ConnectCtx) -> Result<(), IcmtError> {
         // There are four end points along the cycle's halves:
         let (local_out, remote_in) = mpsc::channel::<ServiceCall>();
         let (remote_out, local_in) = mpsc::channel::<Vec<graphics::Result>>();
+        let data_path = PathBuf::from("out/icmt-profile-update.csv");
 
         // 1. Remote interactions via update calls to service.
         // (Consumes remote_in and produces remote_out).
 
-        task::spawn(do_update_task(cfg, remote_in, remote_out));
+        task::spawn(do_update_task(cfg, remote_in, remote_out, data_path));
         let req = if ctx.cfg.cli_opt.all_graphics { graphics::Request::All(window_dim.clone()) } else { graphics::Request::None };
         if is_live {
             local_out.send(ServiceCall::Update(update_events, req))?;
@@ -283,11 +291,12 @@ async fn local_event_loop(ctx: ConnectCtx) -> Result<(), IcmtError> {
         // There are four end points along the cycle's halves:
         let (local_out, remote_in) = mpsc::channel::<Option<(graphics::Dim, Vec<event::EventInfo>)>>();
         let (remote_out, local_in) = mpsc::channel::<graphics::Result>();
+        let data_path = PathBuf::from("out/icmt-profile-view.csv");
 
         // 1. Remote interactions via view calls to service.
         // (Consumes remote_in and produces remote_out).
 
-        task::spawn(do_view_task(cfg, remote_in, remote_out));
+        task::spawn(do_view_task(cfg, remote_in, remote_out, data_path));
         local_out.send(Some((window_dim.clone(), view_events)))?;
         view_events = vec![];
         (local_in, local_out)
@@ -298,10 +307,12 @@ async fn local_event_loop(ctx: ConnectCtx) -> Result<(), IcmtError> {
     let mut ready_flag = true; // view task is ready for more events
 
     let mut update_requests = Nat::from(1); // count update task requests (already one).
-    let mut update_responses = Nat::from(0); // count update task responses (none yet).
+    let mut update_ok_responses = Nat::from(0); // count update task responses (none yet).
+    let mut update_emp_responses = Nat::from(0); // count view task responses (none yet).
 
     let mut view_requests = Nat::from(1); // count view task requests (already one).
-    let mut view_responses = Nat::from(0); // count view task responses (none yet).
+    let mut view_ok_responses = Nat::from(0); // count view task responses (none yet).
+    let mut view_emp_responses = Nat::from(0); // count view task responses (none yet).
 
     let mut replay_event_counter = Nat::from(0); // count replay events replayed (none yet).
 
@@ -457,8 +468,8 @@ async fn local_event_loop(ctx: ConnectCtx) -> Result<(), IcmtError> {
         {
             match view_in.try_recv() {
                 Ok(rr) => {
-                    view_responses += 1;
-                    info!("view_responses = {}", view_responses);
+                    view_ok_responses += 1;
+                    info!("view_ok_responses = {}", view_ok_responses);
 
                     do_redraw(
                         &(ctx.cfg).cli_opt,
@@ -472,7 +483,10 @@ async fn local_event_loop(ctx: ConnectCtx) -> Result<(), IcmtError> {
 
                     ready_flag = true;
                 }
-                Err(mpsc::TryRecvError::Empty) => { /* not ready; do nothing */ }
+                Err(mpsc::TryRecvError::Empty) => {
+                    view_emp_responses += 1;
+                    debug!("view_emp_responses = {}", view_emp_responses);
+                }
                 Err(e) => error!("{:?}", e),
             };
 
@@ -485,7 +499,7 @@ async fn local_event_loop(ctx: ConnectCtx) -> Result<(), IcmtError> {
                 view_out.send(Some((window_dim.clone(), events)))?;
 
                 view_requests += 1;
-                debug!("view_requests = {}", view_requests);
+                info!("view_requests = {}", view_requests);
             }
         };
 
@@ -500,8 +514,8 @@ async fn local_event_loop(ctx: ConnectCtx) -> Result<(), IcmtError> {
                 Ok(graphics) => {
                     debug!("graphics.len() = {}", graphics.len());
                     dump_graphics.extend(graphics);
-                    update_responses += 1;
-                    debug!("update_responses = {}", update_responses);
+                    update_ok_responses += 1;
+                    info!("update_ok_responses = {}", update_ok_responses);
                     if is_live {
                         /* send the local events in the view buffer */
                         let req = if ctx.cfg.cli_opt.all_graphics {
@@ -527,12 +541,14 @@ async fn local_event_loop(ctx: ConnectCtx) -> Result<(), IcmtError> {
                         }
                     };
                     update_requests += 1;
-                    debug!("update_requests = {}", update_requests);
+                    info!("update_requests = {}", update_requests);
                     update_events = view_events;
                     view_events = vec![];
                     dirty_flag = true;
                 }
                 Err(mpsc::TryRecvError::Empty) => {
+                    update_emp_responses += 1;
+                    debug!("update_emp_responses = {}", update_emp_responses);
                     /* Update task not ready */
                     if quit_request {
                         println!("Continue: Quitting...");
@@ -567,6 +583,11 @@ pub async fn service_call(
     if let ServiceCall::FlushQuit = call {
         return Ok(vec![]);
     };
+    let mut data_file = OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(&ctx.data_path)
+        .expect(&format!("Failed to open {:?}", &ctx.data_path));
     let prefix = match &call {
         ServiceCall::FlushQuit => unreachable!(),
         ServiceCall::View { .. } => "Service (view):",
@@ -614,14 +635,16 @@ pub async fn service_call(
             Some(resp)
         }
     };
-    let elapsed = timestamp.elapsed().unwrap();
+    let call_elapsed = timestamp.elapsed().unwrap();
     if let Some(blob_res) = blob_res {
         info!(
             "{}: Ok: Response size {:?} bytes; elapsed time {:?}",
             prefix,
             blob_res.len(),
-            elapsed
+            call_elapsed
         );
+        let decode_size = blob_res.len();
+        let decode_begin = std::time::SystemTime::now();
         match call.clone() {
             ServiceCall::FlushQuit => Ok(vec![]),
             ServiceCall::Update(_, _) => match candid::Decode!(&(*blob_res), Vec<graphics::Result>)
@@ -646,6 +669,22 @@ pub async fn service_call(
                             res_log
                         );
                     }
+                    let decode_elapsed = decode_begin.elapsed().unwrap();
+                    info!(
+                        "{:?} bytes of Candid decoded in elapsed time {:?}",
+                        decode_size, decode_elapsed
+                    );
+                    data_file.write_all(
+                        format!(
+                            "{}, {}, {}, {}\n",
+                            Local::now().to_rfc3339(),
+                            call_elapsed.as_nanos(),
+                            decode_size,
+                            decode_elapsed.as_nanos(),
+                        )
+                        .as_bytes(),
+                    )?;
+                    data_file.sync_all()?;
                     Ok(vec![res])
                 }
                 Err(candid_err) => {
@@ -657,7 +696,7 @@ pub async fn service_call(
     } else {
         error!(
             "{}: Error result: {:?}; elapsed time {:?}",
-            prefix, blob_res, elapsed
+            prefix, blob_res, call_elapsed
         );
         Err(IcmtError::String("ic-mt error".to_string()))
     }
@@ -676,6 +715,7 @@ async fn run(cfg: ConnectCfg) -> IcmtResult<()> {
         cfg,
         canister_id,
         agent,
+        data_path: PathBuf::from("."),
     };
     trace!("{:?}", ctx.cfg);
 
